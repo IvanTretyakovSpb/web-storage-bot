@@ -1,4 +1,4 @@
-package com.tretykov;
+package com.tretyakov;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
