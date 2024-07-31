@@ -3,6 +3,7 @@ package com.tretyakov.service.impl;
 import com.tretyakov.dao.AppUserDAO;
 import com.tretyakov.dao.RawDataDAO;
 import com.tretyakov.entity.AppDocument;
+import com.tretyakov.entity.AppPhoto;
 import com.tretyakov.entity.AppUser;
 import com.tretyakov.entity.RawData;
 import com.tretyakov.entity.enums.UserState;
@@ -93,10 +94,17 @@ public class MainServiceImpl implements MainService {
             return;
         }
 
-        //TODO добавить сохранение фото
-        String answer = "Photo has loaded successfully. Reference for downloading: " +
-                "http://test.com/get-photo/77";
-        sendAnswer(answer, chatId);
+        try {
+            AppPhoto photo = fileService.processPhoto(update.getMessage());
+            //TODO добавить генерацию ссылки для скачивания фото
+            String answer = "Photo has loaded successfully. Reference for downloading: " +
+                    "http://test.com/get-photo/77";
+            sendAnswer(answer, chatId);
+        } catch (UploadFileException ex) {
+            log.error(ex);
+            String error = "Sorry, photo upload failed. Please try again later.";
+            sendAnswer(error, chatId);
+        }
     }
 
     private boolean isNotAllowToSendContent(Long chatId, AppUser appUser) {
