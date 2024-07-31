@@ -8,6 +8,8 @@ import com.tretyakov.entity.AppPhoto;
 import com.tretyakov.entity.BinaryContent;
 import com.tretyakov.exceptions.UploadFileException;
 import com.tretyakov.service.FileService;
+import com.tretyakov.service.enums.LinkType;
+import com.tretyakov.utils.CryptoTool;
 import lombok.extern.log4j.Log4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,14 +34,19 @@ public class FileServiceImpl implements FileService {
     private String fileInfoUri;
     @Value("${service.file_storage.uri}")
     private String fileStorageUri;
+    @Value("${link.address}")
+    private String linkAddress;
     private final AppPhotoDAO appPhotoDAO;
     private final AppDocumentDAO appDocumentDAO;
     private final BinaryContentDAO binaryContentDAO;
+    private final CryptoTool cryptoTool;
 
-    public FileServiceImpl(AppPhotoDAO appPhotoDAO, AppDocumentDAO appDocumentDAO, BinaryContentDAO binaryContentDAO) {
+    public FileServiceImpl(AppPhotoDAO appPhotoDAO, AppDocumentDAO appDocumentDAO, BinaryContentDAO binaryContentDAO,
+                           CryptoTool cryptoTool) {
         this.appPhotoDAO = appPhotoDAO;
         this.appDocumentDAO = appDocumentDAO;
         this.binaryContentDAO = binaryContentDAO;
+        this.cryptoTool = cryptoTool;
     }
 
     @Override
@@ -58,8 +65,9 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public AppPhoto processPhoto(Message telegramMessage) {
-        //TODO реализована обработка только одного фото в сообщении
-        PhotoSize telegramPhoto = telegramMessage.getPhoto().get(0);
+        int photoSizeCount = telegramMessage.getPhoto().size();
+        int photoIndex = photoSizeCount > 1 ? photoSizeCount - 1 : 0;
+        PhotoSize telegramPhoto = telegramMessage.getPhoto().get(photoIndex);
         String fileId = telegramPhoto.getFileId();
         ResponseEntity<String> response = getFilePath(fileId);
         if (response.getStatusCode() == HttpStatus.OK) {
@@ -71,43 +79,34 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    @Override
+    public String generateLink(Long docId, LinkType linkType) {
+        String hash = cryptoTool.hashOf(docId);
+        return "http://" + linkAddress + "/" + linkType + "?id=" + hash;
+    }
+
     private BinaryContent getPersistentBinaryContent(ResponseEntity<String> response) {
         String filePath = getFilePath(response);
         byte[] fileInByte = downloadFile(filePath);
-        BinaryContent transientBinaryContent = BinaryContent.builder()
-                .fileAsArrayOfBytes(fileInByte)
-                .build();
+        BinaryContent transientBinaryContent = BinaryContent.builder().fileAsArrayOfBytes(fileInByte).build();
         return binaryContentDAO.save(transientBinaryContent);
     }
 
     private static String getFilePath(ResponseEntity<String> response) {
         JSONObject jsonObject = new JSONObject(response.getBody());
-        return String.valueOf(jsonObject
-                .getJSONObject("result")
-                .getString("file_path"));
+        return String.valueOf(jsonObject.getJSONObject("result").getString("file_path"));
     }
 
     private AppDocument buildTransientAppDoc(Document telegramDoc, BinaryContent persistentBinaryContent) {
-        return AppDocument.builder()
-                .telegramFileId(telegramDoc.getFileId())
-                .docName(telegramDoc.getFileName())
-                .binaryContent(persistentBinaryContent)
-                .mimeType(telegramDoc.getMimeType())
-                .fileSize(telegramDoc.getFileSize())
-                .build();
+        return AppDocument.builder().telegramFileId(telegramDoc.getFileId()).docName(telegramDoc.getFileName()).binaryContent(persistentBinaryContent).mimeType(telegramDoc.getMimeType()).fileSize(telegramDoc.getFileSize()).build();
     }
 
     private AppPhoto buildTransientAppPhoto(PhotoSize telegramPhoto, BinaryContent persistentBinaryContent) {
-        return AppPhoto.builder()
-                .telegramFileId(telegramPhoto.getFileId())
-                .binaryContent(persistentBinaryContent)
-                .fileSize(telegramPhoto.getFileSize())
-                .build();
+        return AppPhoto.builder().telegramFileId(telegramPhoto.getFileId()).binaryContent(persistentBinaryContent).fileSize(telegramPhoto.getFileSize()).build();
     }
 
     private byte[] downloadFile(String filePath) {
-        String fullUri = fileStorageUri.replace("{token}", token)
-                .replace("{filePath}", filePath);
+        String fullUri = fileStorageUri.replace("{token}", token).replace("{filePath}", filePath);
         URL urlObj = null;
         try {
             urlObj = new URL(fullUri);
@@ -127,13 +126,6 @@ public class FileServiceImpl implements FileService {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders httpHeaders = new HttpHeaders();
         HttpEntity<String> request = new HttpEntity<>(httpHeaders);
-        return restTemplate.exchange(
-                fileInfoUri,
-                HttpMethod.GET,
-                request,
-                String.class,
-                token,
-                fileId
-        );
+        return restTemplate.exchange(fileInfoUri, HttpMethod.GET, request, String.class, token, fileId);
     }
 }

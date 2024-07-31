@@ -11,6 +11,7 @@ import com.tretyakov.exceptions.UploadFileException;
 import com.tretyakov.service.FileService;
 import com.tretyakov.service.MainService;
 import com.tretyakov.service.ProducerService;
+import com.tretyakov.service.enums.LinkType;
 import com.tretyakov.service.enums.ServiceCommand;
 import lombok.extern.log4j.Log4j;
 import org.springframework.stereotype.Service;
@@ -73,9 +74,8 @@ public class MainServiceImpl implements MainService {
 
         try {
             AppDocument doc = fileService.processDoc(update.getMessage());
-            //TODO добавить генерацию ссылки для скачивания документа
-            String answer = "Document has uploaded successfully. Reference for downloading: " +
-                    "http://test.com/get-document/33";
+            String link = fileService.generateLink(doc.getId(), LinkType.GET_DOC);
+            String answer = "Document has uploaded successfully. Reference for downloading: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException ex) {
             log.error(ex);
@@ -96,9 +96,8 @@ public class MainServiceImpl implements MainService {
 
         try {
             AppPhoto photo = fileService.processPhoto(update.getMessage());
-            //TODO добавить генерацию ссылки для скачивания фото
-            String answer = "Photo has loaded successfully. Reference for downloading: " +
-                    "http://test.com/get-photo/77";
+            String link = fileService.generateLink(photo.getId(), LinkType.GET_PHOTO);
+            String answer = "Photo has loaded successfully. Reference for downloading: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException ex) {
             log.error(ex);
