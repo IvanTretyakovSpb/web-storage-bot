@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "app_user")
 public class AppUser {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -30,5 +29,4 @@ public class AppUser {
     private Boolean isActive;
     @Enumerated(EnumType.STRING)
     private UserState state;
-
 }
