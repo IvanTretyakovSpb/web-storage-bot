@@ -8,6 +8,7 @@ import com.tretyakov.entity.AppUser;
 import com.tretyakov.entity.RawData;
 import com.tretyakov.entity.enums.UserState;
 import com.tretyakov.exceptions.UploadFileException;
+import com.tretyakov.service.AppUserService;
 import com.tretyakov.service.FileService;
 import com.tretyakov.service.MainService;
 import com.tretyakov.service.ProducerService;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
+
+import java.util.Optional;
 
 import static com.tretyakov.entity.enums.UserState.BASIC_STATE;
 import static com.tretyakov.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
@@ -31,12 +34,15 @@ public class MainServiceImpl implements MainService {
     private final ProducerService producerService;
     private final AppUserDAO appUserDAO;
     private final FileService fileService;
+    private final AppUserService appUserService;
 
-    public MainServiceImpl(RawDataDAO rawDataDAO, ProducerService producerService, AppUserDAO appUserDAO, FileService fileService) {
+    public MainServiceImpl(RawDataDAO rawDataDAO, ProducerService producerService,
+                           AppUserDAO appUserDAO, FileService fileService, AppUserService appUserService) {
         this.rawDataDAO = rawDataDAO;
         this.producerService = producerService;
         this.appUserDAO = appUserDAO;
         this.fileService = fileService;
+        this.appUserService = appUserService;
     }
 
     @Override
@@ -53,7 +59,7 @@ public class MainServiceImpl implements MainService {
         } else if (BASIC_STATE.equals(userState)) {
             output = processServiceCommand(appUser, text);
         } else if (WAIT_FOR_EMAIL_STATE.equals(userState)) {
-            //TODO добавить обработку email
+            output = appUserService.setEmail(appUser, text);
         } else {
             log.error("Unknown user state: " + userState);
             output = "Unknown error! Enter /cancel and try again";
@@ -130,8 +136,7 @@ public class MainServiceImpl implements MainService {
     private String processServiceCommand(AppUser appUser, String cmd) {
         ServiceCommand serviceCommand = fromValue(cmd);
         if (REGISTRATION.equals(serviceCommand)) {
-            //TODO добавить регистрацию
-            return "Temporarily not available!";
+            return appUserService.registerUser(appUser);
         } else if (HELP.equals(serviceCommand)) {
             return help();
         } else if (START.equals(serviceCommand)) {
@@ -155,20 +160,19 @@ public class MainServiceImpl implements MainService {
 
     private AppUser findOrSaveAppUser(Update update) {
         User telegramUser = update.getMessage().getFrom();
-        AppUser persistantAppUser = appUserDAO.findAppUserByTelegramUserId(telegramUser.getId());
-        if (persistantAppUser == null) {
+        Optional<AppUser> optionalAppUser = appUserDAO.findByTelegramUserId(telegramUser.getId());
+        if (optionalAppUser.isEmpty()) {
             AppUser transientAppUser = AppUser.builder()
                     .telegramUserId(telegramUser.getId())
                     .username(telegramUser.getUserName())
                     .firstName(telegramUser.getFirstName())
                     .lastName(telegramUser.getLastName())
-                    //TODO изменить значение по умолчанию после добавления регистрации
-                    .isActive(true)
+                    .isActive(false)
                     .state(BASIC_STATE)
                     .build();
             return appUserDAO.save(transientAppUser);
         }
-        return persistantAppUser;
+        return optionalAppUser.get();
     }
 
     private void saveRawData(Update update) {

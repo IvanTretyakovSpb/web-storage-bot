@@ -13,7 +13,6 @@ import static com.tretyakov.model.RabbitQueue.*;
 @Component
 @Log4j
 public class UpdateController {
-
     private TelegramBot telegramBot;
     private final MessageUtils messageUtils;
     private final UpdateProducer updateProducer;

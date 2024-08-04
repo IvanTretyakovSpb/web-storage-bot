@@ -3,7 +3,7 @@ package com.tretyakov.utils;
 import org.hashids.Hashids;
 
 public class CryptoTool {
-    int MIN_HASH_LENGTH = 10;
+    private final static int MIN_HASH_LENGTH = 10;
     private final Hashids hashids;
 
     public CryptoTool(String salt) {
